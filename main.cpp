@@ -15,9 +15,12 @@ double calc_sequential(const std::vector<double>& a) {
 }
 
 double calc_parallel(const std::vector<double>& a, int threads) {
+    if (threads <= 0) {
+        return 0.0;
+    }
+
     double total_sum = 0.0;
     int n = static_cast<int>(a.size());
-    int used_threads = threads;
 
     std::vector<double> local_sums(threads, 0.0);
     std::vector<double> local_products(threads, 1.0);
@@ -26,7 +29,6 @@ double calc_parallel(const std::vector<double>& a, int threads) {
     {
         int tid = omp_get_thread_num();
         int nthreads = omp_get_num_threads();
-        used_threads = nthreads;
 
         int chunk = n / nthreads;
         int start = tid * chunk;
@@ -45,7 +47,7 @@ double calc_parallel(const std::vector<double>& a, int threads) {
     }
 
     double current_P = 1.0;
-    for (int t = 0; t < used_threads; t++) {
+    for (int t = 0; t < threads; t++) {
         total_sum += current_P * local_sums[t];
         current_P *= local_products[t];
     }
@@ -79,7 +81,15 @@ int main() {
             double end_par = omp_get_wtime();
             double time_par = end_par - start_par;
 
-            double speedup = (time_par > 0.0) ? (time_seq / time_par) : std::numeric_limits<double>::infinity();
+            constexpr double kTimeEps = 1e-12;
+            double speedup = 0.0;
+            if (time_par <= kTimeEps) {
+                speedup = std::numeric_limits<double>::infinity();
+            } else if (time_seq <= kTimeEps) {
+                speedup = 0.0;
+            } else {
+                speedup = time_seq / time_par;
+            }
 
             std::cout << "Threads: " << std::setw(2) << m
                       << " | Result: " << std::scientific << res_par
