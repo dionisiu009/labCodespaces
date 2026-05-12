@@ -19,8 +19,8 @@ double calc_parallel(const vector<double>& a, int threads) {
     double total_sum = 0.0;
     int n = static_cast<int>(a.size());
 
-    vector<double> local_S(threads, 0.0);
-    vector<double> local_P(threads, 1.0);
+    vector<double> local_sums(threads, 0.0);
+    vector<double> local_products(threads, 1.0);
 
 #pragma omp parallel num_threads(threads)
     {
@@ -31,22 +31,22 @@ double calc_parallel(const vector<double>& a, int threads) {
         int start = tid * chunk;
         int end = (tid == nthreads - 1) ? n : (tid + 1) * chunk;
 
-        double S = 0.0;
-        double P = 1.0;
+        double partial_sum = 0.0;
+        double partial_product = 1.0;
 
         for (int i = start; i < end; i++) {
-            P *= a[i];
-            S += P;
+            partial_product *= a[i];
+            partial_sum += partial_product;
         }
 
-        local_S[tid] = S;
-        local_P[tid] = P;
+        local_sums[tid] = partial_sum;
+        local_products[tid] = partial_product;
     }
 
     double current_P = 1.0;
     for (int t = 0; t < threads; t++) {
-        total_sum += current_P * local_S[t];
-        current_P *= local_P[t];
+        total_sum += current_P * local_sums[t];
+        current_P *= local_products[t];
     }
 
     return total_sum;
@@ -78,7 +78,7 @@ int main() {
             double end_par = omp_get_wtime();
             double time_par = end_par - start_par;
 
-            double speedup = time_seq / time_par;
+            double speedup = (time_par > 0.0) ? (time_seq / time_par) : 0.0;
 
             cout << "Threads: " << setw(2) << m
                  << " | Result: " << scientific << res_par
